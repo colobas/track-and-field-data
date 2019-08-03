@@ -5,8 +5,10 @@ display(HTML("<style>.container { width:90% !important; }</style>"))
 # %%
 import pandas as pd
 import numpy as np
+import math
 
 # %%
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -86,6 +88,90 @@ data = [
 fig = go.Figure(data=data, layout=layout)
 
 plotly.offline.iplot(fig, filename = 'parcoord-dimensions')
+
+# %%
+interpolated_df = df.copy()
+interpolated_df[[col for col in df.columns if ("_sec" in col) and ("_normed" not in col)]] = df[[col for col in df.columns if ("_sec" in col) and ("_normed" not in col)]].interpolate(method="linear", axis=1)
+
+# %%
+cols = [col for col in df.columns if ("_sec" in col) and ("_normed" not in col)]
+
+# %%
+init_notebook_mode(connected=True)
+
+layout = go.Layout(
+    autosize=False,
+    width=1000,
+    height=500,
+    plot_bgcolor = '#E5E5E5',
+    paper_bgcolor = '#E5E5E5',
+)
+
+dimensions = []
+for col in cols[2:]:
+    
+    m = interpolated_df[col].min()
+    M = interpolated_df[col].max()
+    
+    pad = (12 - (M - m))/2
+    
+    tickvals = [m-pad] + list(range(math.ceil(m-pad), math.floor(M+pad)+1)) + [M+pad]
+    if col not in ("300_sec", "400_sec"):
+        ticktext = [f"{int(tick//60)}:{int(tick%60):02}" for tick in tickvals]
+        
+        dimensions += [
+            dict(range=[m-pad, M+pad],
+                 label=col,
+                 values=interpolated_df[col].values,
+                 tickvals=tickvals,
+                 ticktext=ticktext)
+        ]
+    else:
+        dimensions += [
+            dict(range=[m-pad, M+pad],
+                 label=col,
+                 values=interpolated_df[col].values,
+                 tickvals=tickvals)
+        ]
+
+data = [
+    go.Parcoords(
+        #line=dict(color=interpolated_df["categ"].astype("category").cat.codes/2,
+        #          colorscale=[[0, "orange"], [0.5, "green"], [1, "blue"]]),
+        dimensions=dimensions
+    )
+    
+]
+
+fig = go.Figure(data=data, layout=layout)
+
+plotly.offline.iplot(fig, filename = 'parcoord-dimensions')
+
+# %%
+loc = interpolated_df.loc[lambda x: x["1500_sec"] <= 246]
+
+f, axs = plt.subplots(1, 7, figsize=(28, 5))
+for ax, col in zip(axs, [
+    "300_sec",
+    "400_sec",
+    "700_sec",
+    "800_sec",
+    "1100_sec",
+    "1200_sec",
+    "1500_sec"]):
+    
+    sns.swarmplot(y=interpolated_df[col], ax=ax)
+    if col not in ("300_sec", "400_sec"):
+        formatter = mpl.ticker.FuncFormatter(
+            lambda sec, x: f"{int(sec//60)}:{int(sec%60)}")
+        ax.yaxis.set_major_formatter(formatter)    
+    
+    
+plt.show()
+
+# %%
+plt.figure(figsize=(20, 10))
+sns.violinplot(data=df[["300_sec", "500_sec", "700_sec", "900_sec", "1100_sec", "1300_sec", "1500_sec"]])
 
 # %%
 init_notebook_mode(connected=True)
@@ -197,7 +283,7 @@ df[cols1].dtypes
 cols = ["300_speed", "700-300_speed", "1100-700_speed", "1500-1100_speed"]
 
 new_cols = []
-for i in range(1, len(cols1)):
+for i in range(1, len(cols)):
     df[f"{cols[i]}_{cols[i-1]}_diff"] = df[cols[i]] - df[cols[i-1]]
     
     new_cols.append(f"{cols[i]}_{cols[i-1]}_diff")
@@ -245,8 +331,5 @@ for col in ["300_sec", "700-300", "1100-700"]:
     plt.title(f"1500_sec x {col}")
     plt.scatter(df[col], df["1500_sec"], s=10)
     plt.show()
-
-# %%
-df.loc[df["1500_sec"] <= 240].loc[81]
 
 # %%
